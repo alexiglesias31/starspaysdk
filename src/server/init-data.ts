@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { WebAppInitData, WebAppUser } from '../types/telegram.js';
 
 /**
@@ -39,14 +39,40 @@ export function validateInitData(
     .update(dataCheckString)
     .digest('hex');
 
-  if (computedHash !== hash) {
+  // Validate hash is a valid hex string before comparison
+  if (!/^[0-9a-f]{64}$/i.test(hash)) {
+    throw new StarsPayValidationError('Invalid initData hash');
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  const hashBuffer = Buffer.from(hash, 'hex');
+  const computedBuffer = Buffer.from(computedHash, 'hex');
+  if (hashBuffer.length !== computedBuffer.length || !timingSafeEqual(hashBuffer, computedBuffer)) {
     throw new StarsPayValidationError('Invalid initData hash');
   }
 
   // Check auth_date staleness
-  const authDate = parseInt(params.get('auth_date') || '0', 10);
-  const maxAge = options?.maxAgeSeconds ?? 86400; // Default: 1 day
+  const authDateStr = params.get('auth_date');
+  if (!authDateStr) {
+    throw new StarsPayValidationError('Missing auth_date in initData');
+  }
+  const authDate = parseInt(authDateStr, 10);
+  if (!Number.isInteger(authDate) || authDate <= 0) {
+    throw new StarsPayValidationError('Invalid auth_date in initData');
+  }
+  const maxAge = options?.maxAgeSeconds ?? 3600; // Default: 1 hour
+  const MAX_ALLOWED_AGE = 86400; // 24 hours
+  if (!Number.isInteger(maxAge) || maxAge <= 0) {
+    throw new StarsPayValidationError('maxAgeSeconds must be a positive integer');
+  }
+  if (maxAge > MAX_ALLOWED_AGE) {
+    throw new StarsPayValidationError(`maxAgeSeconds cannot exceed ${MAX_ALLOWED_AGE} (24 hours)`);
+  }
   const now = Math.floor(Date.now() / 1000);
+
+  if (authDate > now + 30) {
+    throw new StarsPayValidationError('initData auth_date is in the future');
+  }
 
   if (now - authDate > maxAge) {
     throw new StarsPayValidationError(
@@ -54,31 +80,52 @@ export function validateInitData(
     );
   }
 
-  // Parse user data
+  // Parse user data with safe JSON parsing
   const userStr = params.get('user');
-  const user: WebAppUser | undefined = userStr ? JSON.parse(userStr) : undefined;
+  const user: WebAppUser | undefined = userStr ? safeJsonParse<WebAppUser>(userStr, 'user') : undefined;
 
   const receiverStr = params.get('receiver');
-  const receiver: WebAppUser | undefined = receiverStr ? JSON.parse(receiverStr) : undefined;
+  const receiver: WebAppUser | undefined = receiverStr ? safeJsonParse<WebAppUser>(receiverStr, 'receiver') : undefined;
 
   const chatStr = params.get('chat');
-  const chat = chatStr ? JSON.parse(chatStr) : undefined;
+  const chat = chatStr ? safeJsonParse<WebAppInitData['chat']>(chatStr, 'chat') : undefined;
+
+  const rawChatType = params.get('chat_type');
+  const VALID_CHAT_TYPES = ['sender', 'private', 'group', 'supergroup', 'channel'];
+  const chat_type = rawChatType && VALID_CHAT_TYPES.includes(rawChatType)
+    ? rawChatType as WebAppInitData['chat_type']
+    : undefined;
 
   return {
     query_id: params.get('query_id') || undefined,
     user,
     receiver,
     chat,
-    chat_type: params.get('chat_type') as WebAppInitData['chat_type'],
+    chat_type,
     chat_instance: params.get('chat_instance') || undefined,
     start_param: params.get('start_param') || undefined,
     can_send_after: params.has('can_send_after')
-      ? parseInt(params.get('can_send_after')!, 10)
+      ? (Number.isFinite(parseInt(params.get('can_send_after')!, 10))
+        ? parseInt(params.get('can_send_after')!, 10)
+        : undefined)
       : undefined,
     auth_date: authDate,
     hash,
     signature: params.get('signature') || undefined,
   };
+}
+
+function safeJsonParse<T>(value: string, fieldName: string): T {
+  try {
+    const parsed = JSON.parse(value);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new StarsPayValidationError(`initData field "${fieldName}" must be a JSON object`);
+    }
+    return parsed as T;
+  } catch (err) {
+    if (err instanceof StarsPayValidationError) throw err;
+    throw new StarsPayValidationError(`Invalid JSON in initData field: ${fieldName}`);
+  }
 }
 
 export class StarsPayValidationError extends Error {

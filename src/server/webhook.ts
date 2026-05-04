@@ -3,11 +3,13 @@ import type {
   PreCheckoutQuery,
   SuccessfulPayment,
   RefundedPayment,
+  ShippingQuery,
 } from '../types/telegram.js';
 import type { PaymentType } from '../types/payment.js';
 
 export type WebhookEventType =
   | 'pre_checkout'
+  | 'shipping_query'
   | 'payment.one_time'
   | 'payment.subscription_initial'
   | 'payment.subscription_renewal'
@@ -21,6 +23,7 @@ export interface ParsedWebhookEvent {
   preCheckoutQuery: PreCheckoutQuery | null;
   successfulPayment: SuccessfulPayment | null;
   refundedPayment: RefundedPayment | null;
+  shippingQuery: ShippingQuery | null;
   telegramUserId: number | null;
 }
 
@@ -37,7 +40,22 @@ export function parseWebhookUpdate(update: TelegramUpdate): ParsedWebhookEvent {
       preCheckoutQuery: update.pre_checkout_query,
       successfulPayment: null,
       refundedPayment: null,
+      shippingQuery: null,
       telegramUserId: update.pre_checkout_query.from.id,
+    };
+  }
+
+  // Shipping query
+  if (update.shipping_query) {
+    return {
+      type: 'shipping_query',
+      paymentType: null,
+      update,
+      preCheckoutQuery: null,
+      successfulPayment: null,
+      refundedPayment: null,
+      shippingQuery: update.shipping_query,
+      telegramUserId: update.shipping_query.from.id,
     };
   }
 
@@ -45,6 +63,7 @@ export function parseWebhookUpdate(update: TelegramUpdate): ParsedWebhookEvent {
   if (update.message?.successful_payment) {
     const payment = update.message.successful_payment;
     const paymentType = classifyPaymentType(payment);
+    const userId = update.message.from?.id;
 
     return {
       type: `payment.${paymentType}` as WebhookEventType,
@@ -53,12 +72,14 @@ export function parseWebhookUpdate(update: TelegramUpdate): ParsedWebhookEvent {
       preCheckoutQuery: null,
       successfulPayment: payment,
       refundedPayment: null,
-      telegramUserId: update.message.from?.id ?? null,
+      shippingQuery: null,
+      telegramUserId: (typeof userId === 'number' && Number.isInteger(userId) && userId > 0) ? userId : null,
     };
   }
 
   // Refunded payment
   if (update.message?.refunded_payment) {
+    const userId = update.message.from?.id;
     return {
       type: 'payment.refunded',
       paymentType: null,
@@ -66,7 +87,8 @@ export function parseWebhookUpdate(update: TelegramUpdate): ParsedWebhookEvent {
       preCheckoutQuery: null,
       successfulPayment: null,
       refundedPayment: update.message.refunded_payment,
-      telegramUserId: update.message.from?.id ?? null,
+      shippingQuery: null,
+      telegramUserId: (typeof userId === 'number' && Number.isInteger(userId) && userId > 0) ? userId : null,
     };
   }
 
@@ -77,6 +99,7 @@ export function parseWebhookUpdate(update: TelegramUpdate): ParsedWebhookEvent {
     preCheckoutQuery: null,
     successfulPayment: null,
     refundedPayment: null,
+    shippingQuery: null,
     telegramUserId: null,
   };
 }
@@ -91,6 +114,11 @@ function classifyPaymentType(payment: SuccessfulPayment): PaymentType {
   if (payment.is_recurring) {
     return 'subscription_renewal';
   }
+  // Defensive: if Telegram sends is_first_recurring without is_recurring, treat as subscription_initial
+  if (payment.is_first_recurring && !payment.is_recurring) {
+    console.warn('[starspay] WARNING: is_first_recurring=true but is_recurring=false — treating as subscription_initial');
+    return 'subscription_initial';
+  }
   return 'one_time';
 }
 
@@ -100,6 +128,7 @@ function classifyPaymentType(payment: SuccessfulPayment): PaymentType {
 export function isPaymentUpdate(update: TelegramUpdate): boolean {
   return !!(
     update.pre_checkout_query ||
+    update.shipping_query ||
     update.message?.successful_payment ||
     update.message?.refunded_payment
   );

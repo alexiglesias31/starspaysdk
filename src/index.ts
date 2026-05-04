@@ -6,3 +6,7 @@
  */
 
 export * from './types/index.js';
+
+export { generateProductLink, parseProductLink } from './product-links.js';
+export type { ProductLinkType, ProductLinkOptions, ParsedProductLink } from './product-links.js';
+export { TxLimitExceededError } from './errors/tx-limit-exceeded-error.js';

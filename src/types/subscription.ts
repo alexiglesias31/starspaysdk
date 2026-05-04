@@ -9,7 +9,7 @@ export type SubscriptionStatus =
   | 'revoked';
 
 /** States where the user has access to the product */
-export const ENTITLED_STATUSES: SubscriptionStatus[] = [
+export const ENTITLED_STATUSES: readonly SubscriptionStatus[] = [
   'active',
   'canceled',
   'past_due',
@@ -41,6 +41,13 @@ export interface Subscription {
   canceled_at: number | null;
   /** App-defined grace period in seconds (default: 3 days) */
   grace_period_seconds: number;
+  /**
+   * Whether the user keeps entitlement while the subscription is `past_due` (in
+   * the grace window). Snapshot from `products.retain_access_during_grace` at
+   * subscription creation. Undefined or true → entitled; false → denied in
+   * past_due.
+   */
+  retain_access_during_grace?: boolean;
   /** When the subscription was created */
   created_at: string;
   /** When the subscription was last updated */
@@ -65,11 +72,11 @@ export type SubscriptionEventType =
   | 'subscription.reactivated';
 
 /** Valid state transitions */
-export const VALID_TRANSITIONS: Record<SubscriptionStatus, SubscriptionStatus[]> = {
-  pending: ['active', 'expired'],
-  active: ['active', 'canceled', 'past_due', 'revoked'],
-  canceled: ['active', 'expired'],
-  past_due: ['active', 'expired'],
-  expired: ['active'],
-  revoked: ['canceled'],
-};
+export const VALID_TRANSITIONS: Readonly<Record<SubscriptionStatus, readonly SubscriptionStatus[]>> = Object.freeze({
+  pending: Object.freeze(['active', 'expired', 'revoked'] as const),
+  active: Object.freeze(['active', 'canceled', 'past_due', 'revoked'] as const),
+  canceled: Object.freeze(['active', 'expired', 'revoked'] as const),
+  past_due: Object.freeze(['active', 'expired', 'revoked'] as const),
+  expired: Object.freeze(['active', 'revoked'] as const),
+  revoked: Object.freeze([] as const),
+});

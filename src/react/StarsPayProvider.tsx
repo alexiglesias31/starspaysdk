@@ -5,6 +5,7 @@ import type { StarsPayClientConfig } from '../types/config.js';
 interface StarsPayContextValue {
   client: StarsPayClient;
   telegramUserId: number | null;
+  testMode: boolean;
 }
 
 const StarsPayContext = createContext<StarsPayContextValue | null>(null);
@@ -15,6 +16,11 @@ export interface StarsPayProviderProps extends StarsPayClientConfig {
   telegramUserId?: number;
   /** Cache TTL in milliseconds */
   cacheTtl?: number;
+  /**
+   * Bypass subscription checks — all gates and hooks treat the user as subscribed.
+   * Use this for development and testing only.
+   */
+  testMode?: boolean;
 }
 
 /**
@@ -22,7 +28,7 @@ export interface StarsPayProviderProps extends StarsPayClientConfig {
  *
  * @example
  * ```tsx
- * <StarsPayProvider apiKey="sp_live_..." telegramUserId={user.id}>
+ * <StarsPayProvider apiKey="sp_pub_..." telegramUserId={user.id}>
  *   <App />
  * </StarsPayProvider>
  * ```
@@ -33,15 +39,18 @@ export function StarsPayProvider({
   apiUrl,
   telegramUserId,
   cacheTtl,
+  testMode,
 }: StarsPayProviderProps) {
+  const resolvedTestMode = testMode ?? false;
+
   const client = useMemo(
-    () => new StarsPayClient({ apiKey, apiUrl, cacheTtl }),
-    [apiKey, apiUrl, cacheTtl]
+    () => new StarsPayClient({ apiKey, apiUrl, cacheTtl, testMode: resolvedTestMode }),
+    [apiKey, apiUrl, cacheTtl, resolvedTestMode]
   );
 
   const value = useMemo(
-    () => ({ client, telegramUserId: telegramUserId ?? null }),
-    [client, telegramUserId]
+    () => ({ client, telegramUserId: telegramUserId ?? null, testMode: resolvedTestMode }),
+    [client, telegramUserId, resolvedTestMode]
   );
 
   return (

@@ -1,5 +1,5 @@
-import { useState, useCallback, type ReactNode, type ButtonHTMLAttributes } from 'react';
-import { useStarsPay } from './StarsPayProvider.js';
+import type { ReactNode, ButtonHTMLAttributes } from 'react';
+import { PaymentButton } from './PaymentButton.js';
 
 export interface PurchaseButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'onError'> {
   /** Price ID for the one-time purchase */
@@ -25,52 +25,6 @@ export interface PurchaseButtonProps extends Omit<ButtonHTMLAttributes<HTMLButto
  * </PurchaseButton>
  * ```
  */
-export function PurchaseButton({
-  priceId,
-  onSuccess,
-  onError,
-  children,
-  disabled,
-  ...buttonProps
-}: PurchaseButtonProps) {
-  const { client, telegramUserId } = useStarsPay();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleClick = useCallback(async () => {
-    if (!telegramUserId) {
-      onError?.(new Error('No Telegram user ID available'));
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const invoiceUrl = await client.createInvoiceLink({
-        priceId,
-        telegramUserId,
-      });
-
-      const status = await client.openPayment(invoiceUrl);
-
-      if (status === 'paid') {
-        onSuccess?.();
-      } else if (status === 'failed') {
-        onError?.(new Error('Payment failed'));
-      }
-    } catch (err) {
-      onError?.(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [client, telegramUserId, priceId, onSuccess, onError]);
-
-  return (
-    <button
-      onClick={handleClick}
-      disabled={disabled || isLoading || !telegramUserId}
-      {...buttonProps}
-    >
-      {isLoading ? 'Processing...' : children ?? 'Purchase'}
-    </button>
-  );
+export function PurchaseButton(props: PurchaseButtonProps) {
+  return <PaymentButton {...props} defaultLabel="Purchase" />;
 }

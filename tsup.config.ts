@@ -33,6 +33,6 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     platform: 'browser',
-    external: ['react', 'react-dom'],
+    external: ['react', 'react-dom', 'react/jsx-runtime'],
   },
 ]);

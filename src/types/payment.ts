@@ -1,5 +1,8 @@
 /** Payment and transaction types */
 
+import type { PaymentProvider } from '../server/providers/types.js';
+export type { PaymentProvider };
+
 export type PaymentType = 'one_time' | 'subscription_initial' | 'subscription_renewal';
 
 export interface Payment {
@@ -9,9 +12,9 @@ export interface Payment {
   telegram_user_id: number;
   subscription_id: string | null;
   type: PaymentType;
-  /** Stars amount */
+  /** Payment amount (in the relevant currency's smallest unit) */
   amount: number;
-  currency: 'XTR';
+  currency: string;
   status: 'succeeded' | 'refunded';
   telegram_payment_charge_id: string;
   provider_payment_charge_id: string;
@@ -19,6 +22,8 @@ export interface Payment {
   /** Estimated USD value at time of payment */
   estimated_usd: number | null;
   created_at: string;
+  /** Payment provider that processed this transaction */
+  provider?: PaymentProvider;
 }
 
 export interface Product {
@@ -27,6 +32,8 @@ export interface Product {
   name: string;
   description: string | null;
   type: 'one_time' | 'subscription';
+  /** Linked channel chat ID for channel membership subscriptions (null for regular products) */
+  channel_chat_id: number | null;
   active: boolean;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -37,15 +44,23 @@ export interface Price {
   id: string;
   product_id: string;
   app_id: string;
-  /** Amount in Stars */
+  /** Amount in the relevant currency's smallest unit */
   amount: number;
-  currency: 'XTR';
+  currency: string;
   /** Subscription period in seconds (2592000 for monthly) */
   period: number | null;
   active: boolean;
   metadata: Record<string, unknown>;
   created_at: string;
+  /** Payment provider for this price */
+  provider?: PaymentProvider;
 }
+
+/** Parameters for creating a new product (server-assigned fields excluded) */
+export type CreateProductParams = Pick<Product, 'name' | 'type'> & Partial<Pick<Product, 'description' | 'active' | 'metadata' | 'channel_chat_id'>>;
+
+/** Parameters for creating a new price (server-assigned fields excluded) */
+export type CreatePriceParams = Pick<Price, 'product_id' | 'amount'> & Partial<Pick<Price, 'period' | 'active' | 'metadata'>>;
 
 export interface Customer {
   id: string;

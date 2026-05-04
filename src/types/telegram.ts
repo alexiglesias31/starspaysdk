@@ -22,7 +22,9 @@ export interface PreCheckoutQuery {
   total_amount: number;
   invoice_payload: string;
   shipping_option_id?: string;
-  order_info?: unknown;
+  order_info?: Record<string, unknown>;
+  is_recurring?: boolean;
+  is_first_recurring?: boolean;
 }
 
 export interface SuccessfulPayment {
@@ -48,6 +50,7 @@ export interface Message {
   message_id: number;
   from?: TelegramUser;
   date: number;
+  text?: string;
   chat: {
     id: number;
     type: string;
@@ -60,6 +63,10 @@ export interface TelegramUpdate {
   update_id: number;
   message?: Message;
   pre_checkout_query?: PreCheckoutQuery;
+  shipping_query?: ShippingQuery;
+  my_chat_member?: ChatMemberUpdated;
+  chat_join_request?: ChatJoinRequest;
+  callback_query?: CallbackQuery;
 }
 
 /** Parameters for createInvoiceLink */
@@ -160,4 +167,100 @@ export interface BotInfo {
   can_join_groups?: boolean;
   can_read_all_group_messages?: boolean;
   supports_inline_queries?: boolean;
+}
+
+/** Parameters for setWebhook */
+export interface SetWebhookParams {
+  url: string;
+  secret_token?: string;
+  allowed_updates?: string[];
+  max_connections?: number;
+  drop_pending_updates?: boolean;
+}
+
+/** Chat member status update (my_chat_member / chat_member) */
+export interface ChatMemberUpdated {
+  chat: {
+    id: number;
+    type: string;
+    title?: string;
+    username?: string;
+  };
+  from: TelegramUser;
+  date: number;
+  old_chat_member: {
+    status: string;
+    user: TelegramUser;
+  };
+  new_chat_member: {
+    status: string;
+    user: TelegramUser;
+  };
+}
+
+/** Callback query from inline keyboard buttons */
+export interface CallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: Message;
+  data?: string;
+  chat_instance?: string;
+}
+
+/** Chat invite link object returned by createChatInviteLink */
+export interface ChatInviteLink {
+  invite_link: string;
+  creator: TelegramUser;
+  creates_join_request: boolean;
+  is_primary: boolean;
+  is_revoked: boolean;
+  name?: string;
+  expire_date?: number;
+  member_limit?: number;
+  pending_join_request_count?: number;
+}
+
+/** Parameters for createChatInviteLink */
+export interface CreateChatInviteLinkParams {
+  chat_id: number | string;
+  name?: string;
+  expire_date?: number;
+  member_limit?: number;
+  creates_join_request?: boolean;
+}
+
+/** Chat join request from chat_join_request update */
+export interface ChatJoinRequest {
+  chat: {
+    id: number;
+    type: string;
+    title?: string;
+    username?: string;
+  };
+  from: TelegramUser;
+  user_chat_id: number;
+  date: number;
+  bio?: string;
+  invite_link?: ChatInviteLink;
+}
+
+/** Chat member info returned by getChatMember */
+export interface ChatMemberInfo {
+  status: 'creator' | 'administrator' | 'member' | 'restricted' | 'left' | 'kicked';
+  user: TelegramUser;
+}
+
+/** Shipping query from a user who selected a shipping address */
+export interface ShippingQuery {
+  id: string;
+  from: TelegramUser;
+  invoice_payload: string;
+  shipping_address: {
+    country_code: string;
+    state: string;
+    city: string;
+    street_line1: string;
+    street_line2: string;
+    post_code: string;
+  };
 }

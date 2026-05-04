@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Subscription } from '../types/subscription.js';
 import { useStarsPay } from './StarsPayProvider.js';
+import { isEntitled } from '../client/index.js';
 
 export interface UseSubscriptionResult {
   isActive: boolean;
@@ -8,6 +9,10 @@ export interface UseSubscriptionResult {
   error: Error | null;
   subscription: Subscription | null;
   refresh: () => Promise<void>;
+}
+
+export interface UseSubscriptionOptions {
+  userIdLoading?: boolean;
 }
 
 /**
@@ -21,40 +26,98 @@ export interface UseSubscriptionResult {
  * return <PremiumContent />;
  * ```
  */
-export function useSubscription(userId?: number): UseSubscriptionResult {
-  const { client, telegramUserId } = useStarsPay();
+export function useSubscription(userId?: number, options?: UseSubscriptionOptions): UseSubscriptionResult {
+  const { client, telegramUserId, testMode } = useStarsPay();
   const targetUserId = userId ?? telegramUserId;
+  const userIdLoading = options?.userIdLoading ?? false;
 
-  const [isActive, setIsActive] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isActive, setIsActive] = useState(testMode);
+  const [isLoading, setIsLoading] = useState(!testMode);
   const [error, setError] = useState<Error | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
 
-  const refresh = useCallback(async () => {
+  const unmountedRef = useRef(false);
+  // Monotonic counter: each fetch call increments this; a result is only applied
+  // if its captured ID still matches, preventing stale responses from overwriting
+  // fresher ones regardless of whether the call came from the effect or refresh().
+  const fetchIdRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
+
+  const fetchSubscription = useCallback(async () => {
+    if (testMode) return;
+
+    if (userIdLoading) {
+      fetchIdRef.current += 1;
+      setIsActive(false);
+      setSubscription(null);
+      setError(null);
+      setIsLoading(true);
+      return;
+    }
+
     if (!targetUserId) {
+      fetchIdRef.current += 1;
+      setIsActive(false);
+      setSubscription(null);
+      setError(null);
       setIsLoading(false);
       return;
     }
+
+    fetchIdRef.current += 1;
+    const thisFetchId = fetchIdRef.current;
 
     setIsLoading(true);
     setError(null);
 
     try {
       const sub = await client.getActiveSubscription(targetUserId);
-      setSubscription(sub);
-      setIsActive(!!sub);
+      if (fetchIdRef.current === thisFetchId && !unmountedRef.current) {
+        setSubscription(sub);
+        setIsActive(isEntitled(sub));
+      }
     } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setIsActive(false);
-      setSubscription(null);
+      if (fetchIdRef.current === thisFetchId && !unmountedRef.current) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+        setIsActive(false);
+        setSubscription(null);
+      }
     } finally {
-      setIsLoading(false);
+      if (fetchIdRef.current === thisFetchId && !unmountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [client, targetUserId]);
+  }, [client, targetUserId, testMode, userIdLoading]);
+
+  const refresh = useCallback(async () => {
+    return fetchSubscription();
+  }, [fetchSubscription]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    fetchSubscription();
+  }, [fetchSubscription]);
+
+  // Reset state when testMode changes
+  useEffect(() => {
+    if (testMode) {
+      fetchIdRef.current += 1; // invalidate any in-flight fetch
+      setIsActive(true);
+      setIsLoading(false);
+      setSubscription(null);
+      setError(null);
+    } else {
+      // Fail-closed: reset to loading state when leaving testMode
+      setIsActive(false);
+      setIsLoading(true);
+      setSubscription(null);
+      setError(null);
+    }
+  }, [testMode]);
 
   return { isActive, isLoading, error, subscription, refresh };
 }

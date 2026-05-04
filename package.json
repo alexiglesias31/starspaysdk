@@ -1,51 +1,77 @@
 {
   "name": "@starspay/sdk",
-  "version": "0.1.0",
-  "description": "Telegram Stars payment SDK - subscriptions, paywalls, and analytics for Telegram Mini Apps",
-  "author": "StarsPay",
+  "version": "0.2.2",
+  "description": "Telegram Stars + Telegram Payments SDK - subscriptions, paywalls, and analytics for Telegram Mini Apps",
+  "author": "Alejandro Iglesias",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexiglesias31/starspaysdk.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/alexiglesias31/starspaysdk/issues"
+  },
+  "homepage": "https://starspay.dev",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
     },
     "./server": {
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js",
-      "require": "./dist/server.cjs"
+      "require": "./dist/server.cjs",
+      "default": "./dist/server.js"
     },
     "./client": {
       "types": "./dist/client.d.ts",
       "import": "./dist/client.js",
-      "require": "./dist/client.cjs"
+      "require": "./dist/client.cjs",
+      "default": "./dist/client.js"
     },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js",
-      "require": "./dist/react.cjs"
+      "require": "./dist/react.cjs",
+      "default": "./dist/react.js"
     }
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build && npm run lint && npm run test"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "jsdom": "^28.1.0",
     "react": "^19.0.0",
     "tsup": "^8.4.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   },
   "peerDependencies": {
     "react": ">=18.0.0"
@@ -59,11 +85,26 @@
     "telegram",
     "stars",
     "payment",
+    "payments",
     "subscription",
+    "subscriptions",
     "mini-app",
     "tma",
+    "tma-sdk",
     "telegram-stars",
+    "telegram-payments",
+    "telegram-bot",
+    "telegram-mini-app",
     "paywall",
-    "monetization"
-  ]
+    "react-paywall",
+    "monetization",
+    "stars-billing",
+    "revenue-sdk",
+    "webhook-handler",
+    "subscription-management",
+    "starspay"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
 }
